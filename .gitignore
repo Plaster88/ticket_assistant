@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.local
+!.env.example
+
+# SQLite database (created & seeded on first run)
+*.db
+secops.db
+
+# Build output
+client/dist/
+
+# Logs & OS files
+*.log
+.DS_Store
