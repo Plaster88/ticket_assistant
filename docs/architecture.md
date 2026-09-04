@@ -5,34 +5,6 @@ Assistant**, an AI chatbot that answers natural-language questions about securit
 incident tickets by translating them into read-only SQL and summarizing the
 results.
 
-## System Diagram
-
-```mermaid
-graph TD
-    A[User types question] --> B[React Chat UI]
-    B -->|POST /api/chat (with history)| C[Node.js API Server]
-    C -->|NL→SQL path| D[Claude API: NL to SQL]
-    D -->|JSON: SELECT ...| C
-    C -->|Validate SQL| E[Read-only SQL Guard]
-    E -->|safe query| F[(SQLite tickets DB)]
-    F -->|rows| C
-    C -->|Summarize rows| G[Claude API: Summarize]
-    G -->|human-readable answer| C
-
-    C -->|RAG path (fallback or doc query)| I[Embeddings / KB Retrieval]
-    I -->|top passages| J[Claude API: RAG Summarize]
-    J -->|answer + provenance| C
-
-    C -->|reply| B
-    B --> H[User sees answer]
-    subgraph Ops
-      K[embeddingsService.buildIndex() at startup]
-      L[POST /api/reindex (x-reindex-token)]
-      K --> I
-      L --> K
-    end
-```
-
 ## Data Flow
 
 1. **User input** — the user asks a question in the React chat interface.
