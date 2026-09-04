@@ -7,7 +7,8 @@
 // model mistake ever reaching the database as a destructive query.
 
 import Anthropic from '@anthropic-ai/sdk';
-import { TABLE_SCHEMA } from './dbService.js';
+import { TABLE_SCHEMA, searchKnowledgeBase } from './dbService.js';
+import { querySimilarDocs, buildIndex } from './embeddingsService.js';
 
 const MODEL = 'claude-opus-4-8';
 
@@ -23,7 +24,7 @@ function client() {
 
 // A safe query we fall back to whenever generation or validation fails, so the
 // pipeline (and a live demo) never dead-ends on an error.
-const SAFE_FALLBACK_SQL = 'SELECT * FROM tickets LIMIT 5';
+export const SAFE_FALLBACK_SQL = 'SELECT * FROM tickets LIMIT 5';
 
 // Only allow a single read-only SELECT. Reject multiple statements and any
 // keyword that could modify or exfiltrate data.
@@ -80,6 +81,56 @@ Rules:
   } catch (error) {
     console.error('[aiService] getSqlFromClaude error:', error.message);
     return SAFE_FALLBACK_SQL;
+  }
+}
+
+// RAG path: retrieve relevant KB docs and ask the model to answer based
+// strictly on those documents. Returns a human-readable answer string.
+export async function getRagAnswer(userPrompt) {
+  try {
+    // Prefer embedding-based retrieval if an index exists; fall back to
+    // simple LIKE search for the PoC.
+    let docs = [];
+    try {
+      docs = await querySimilarDocs(userPrompt, 5);
+    } catch (e) {
+      console.warn('[aiService] Embedding retrieval failed, falling back to LIKE search:', e.message);
+      docs = [];
+    }
+
+    if (!docs || docs.length === 0) {
+      docs = searchKnowledgeBase(userPrompt, 5);
+    }
+
+    if (!docs || docs.length === 0) {
+      return "I couldn't find any relevant documents in the knowledge base to answer that. Try a different wording or ask about tickets directly.";
+    }
+
+    // Compose a provenance-aware prompt: include top passages per doc and
+    // instruct the model to cite document ids/titles and passages when using them.
+    const docBlocks = docs
+      .map((d, i) => {
+        const header = `Document ${i + 1} (id=${d.doc_id}, title="${d.title}")`;
+        const passages = (d.passages || [])
+          .map((p, j) => `Passage ${j + 1}: ${p.text}`)
+          .join('\n');
+        return `${header}\n${passages}\n---`;
+      })
+      .join('\n');
+
+    const userContent = `User question: "${userPrompt}"\n\nRetrieved documents and passages:\n${docBlocks}\n\nAnswer the user's question using ONLY the information in the retrieved passages. When you refer to information, cite it by document id, title, and passage number (for example: Document 2 - Phishing playbook - Passage 1). Provide a short "Provenance" section at the end listing which documents and passages you used.`;
+
+    const response = await client().messages.create({
+      model: MODEL,
+      max_tokens: 800,
+      system: `You are a SecOps assistant that must answer using ONLY the provided documents. Do not hallucinate. Keep the answer concise (3-6 sentences) and include a final Provenance section listing document ids and titles referenced.`,
+      messages: [{ role: 'user', content: userContent }],
+    });
+
+    return response.content.find((b) => b.type === 'text')?.text ?? '';
+  } catch (error) {
+    console.error('[aiService] getRagAnswer error:', error.message);
+    return "I found some documents, but couldn't generate an answer. Please try again.";
   }
 }
 

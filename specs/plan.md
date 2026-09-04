@@ -79,3 +79,36 @@ the LLM directly — the Node.js backend is the single trusted bridge. See
 - Add conversation memory for follow-up questions.
 - Parameterized queries / stricter schema-aware generation.
 - Auth + per-user audit logging.
+
+## RAG Extension (Week 3)
+
+Introduce a Retrieval-Augmented Generation (RAG) path alongside the existing
+NL→SQL pipeline. The RAG path answers questions by retrieving relevant
+documents from a knowledge base and asking the model to generate responses
+grounded in those documents.
+
+Key components:
+
+- **Knowledge base:** a lightweight `knowledge_base` table (or external store)
+  that holds runbooks, incident notes, and other unstructured texts.
+- **Retrieval:** initially a simple full-text or `LIKE` search (PoC), upgradeable
+  to embeddings + a vector store (FAISS/Annoy/Pinecone/Weaviate) for better
+  relevance.
+- **RAG prompt layer:** a focused system prompt that instructs the model to
+  answer using only retrieved documents and to avoid hallucination.
+- **Router in controller:** detect whether a question should go to the SQL
+  pipeline or to the RAG pipeline (heuristic or classifier). If NL→SQL
+  returns the safe fallback, prefer the RAG path.
+
+Conversation context:
+
+- Accept a `history` array from the frontend; pass recent turns into model
+  calls so the assistant can handle follow-up questions within the session.
+- Persisting long-term conversation memory remains out of scope.
+
+Validation & demo:
+
+- Add test queries that exercise both paths (SQL and RAG) and verify the
+  assistant returns grounded answers.
+- Prepare a short demo script showing: SQL query flow, RAG retrieval flow,
+  and a short follow-up question demonstrating context handling.

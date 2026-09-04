@@ -9,6 +9,7 @@ import './config/env.js';
 import express from 'express';
 import cors from 'cors';
 import chatRoutes from './routes/chatRoutes.js';
+import { buildIndex } from './services/embeddingsService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,6 +24,15 @@ if (!process.env.ANTHROPIC_API_KEY) {
   );
 }
 
-app.listen(PORT, () => {
-  console.log(`[server] SecOps Ticket Assistant API listening on http://localhost:${PORT}`);
-});
+(async () => {
+  try {
+    await buildIndex();
+    console.log('[server] Embeddings index built');
+  } catch (err) {
+    console.warn('[server] Failed to build embeddings index:', err.message);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`[server] SecOps Ticket Assistant API listening on http://localhost:${PORT}`);
+  });
+})();

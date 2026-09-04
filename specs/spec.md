@@ -41,6 +41,10 @@ answer. The PoC demonstrates a practical AI capability: **Natural Language → S
    SQL query against the tickets table.
 2. **Contextual summarization** — the LLM turns raw query rows into a concise,
    professional briefing for the user.
+3. **Retrieval-Augmented Generation (RAG)** — for questions outside the
+  structured tickets schema, the system can retrieve relevant documents from
+  a knowledge base (runbooks, incident notes) and generate answers grounded in
+  those documents rather than relying on the model's internal knowledge.
 
 ## 6. Data Model
 
@@ -79,6 +83,12 @@ A single `tickets` table (SQLite for the PoC):
 - [ ] The pipeline degrades gracefully: on any AI/DB error the user gets a
       helpful message, not a crash.
 - [ ] Public GitHub repository contains code **and** this specification.
+ - [ ] The assistant can retrieve and use relevant documents from a knowledge
+   base (RAG) to answer questions that are not expressible as SQL over the
+   `tickets` table.
+ - [ ] The system supports basic conversational context for follow-up
+   questions within a session (frontend sends `history`, backend uses it
+   to disambiguate and answer follow-ups).
 
 ## 10. Out of Scope (PoC)
 
@@ -86,3 +96,6 @@ A single `tickets` table (SQLite for the PoC):
 - Writing or mutating tickets from the chat.
 - Production database (CosmosDB/Postgres) — noted as a future step.
 - Conversation memory across turns (each question is independent).
+
+- Long-term persistent conversation memory is out of scope for the PoC; the
+  system may support short-lived session history to enable follow-up questions.

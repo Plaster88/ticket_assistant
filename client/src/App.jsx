@@ -10,20 +10,26 @@ export default function App() {
   const [loading, setLoading] = useState(false);
 
   const handleSend = async (text) => {
-    setMessages((prev) => [...prev, { role: 'user', text }]);
+    // Add the user's message to local history and send the full history
+    // to the backend so the AI can use conversation context.
     setLoading(true);
 
-    try {
-      const { reply, sql } = await sendMessage(text);
-      setMessages((prev) => [...prev, { role: 'assistant', text: reply, sql }]);
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', text: `Error: ${err.message}` },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+    setMessages((prev) => {
+      const newMessages = [...prev, { role: 'user', text }];
+
+      (async () => {
+        try {
+          const { reply, sql } = await sendMessage(text, newMessages);
+          setMessages((prev2) => [...newMessages, { role: 'assistant', text: reply, sql }]);
+        } catch (err) {
+          setMessages((prev2) => [...newMessages, { role: 'assistant', text: `Error: ${err.message}` }]);
+        } finally {
+          setLoading(false);
+        }
+      })();
+
+      return newMessages;
+    });
   };
 
   return (
