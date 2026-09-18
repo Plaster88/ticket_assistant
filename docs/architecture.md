@@ -38,7 +38,15 @@ results.
 - **Node.js API Server (`/server`)** — the trusted bridge. Orchestrates the
   two Claude calls and the database query.
   - `routes/chatRoutes.js` — HTTP endpoints.
-  - `controllers/aiController.js` — orchestration (question → SQL → DB → summary).
+  - `controllers/aiController.js` — entrypoint that now delegates to the `orchestrator`.
+  - `services/orchestrator.js` — executes a short plan of steps (route, execute, summarize)
+    and coordinates agents. The orchestrator consults the `planner` and runs each
+    step, allowing the planner to mutate the plan at runtime (for example, insert
+    a `retrieve` step when SQL returns no rows).
+  - `services/planner.js` — builds the initial plan and inspects step results to
+    inject fallback or clarification steps (minimal agent loop behaviour).
+  - `services/agents/` — small role-focused agents: `routerAgent`, `sqlAgent`,
+    `sqlExecutor`, `summarizerAgent`, `retrieverAgent`.
   - `services/aiService.js` — Claude API calls + the read-only SQL guard.
   - `services/dbService.js` — SQLite access and demo-data seeding.
     - `services/embeddingsService.js` — builds a small local embeddings index

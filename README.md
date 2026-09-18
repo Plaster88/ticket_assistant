@@ -228,3 +228,32 @@ Demo checklist:
 - Demonstrate a follow-up question to show session-level context handled by
    the backend.
 
+## Orchestration & Planner
+
+The backend now includes a small orchestration layer that executes a short
+plan of steps and coordinates focused agents. This improves modularity and
+allows a minimal agent-loop behaviour without an external framework.
+
+- `server/src/services/orchestrator.js` — executes plan steps and returns
+   `{ reply, sql, rowCount, source }`.
+- `server/src/services/planner.js` — builds an initial plan (`route` →
+   `execute` → `summarize`) and can mutate the plan at runtime (for example,
+   inserting a `retrieve` step if SQL returns no rows).
+- `server/src/services/agents/` — small agents implementing roles: router,
+   SQL generator, SQL executor, summarizer, retriever (RAG).
+
+This makes the pipeline easier to test and extend (clarify/verify steps,
+retries, or human-in-the-loop prompts can be added as new plan steps).
+
+## Testing
+
+Run a lightweight smoke test that starts the server, waits for `/api/health`,
+then calls `/api/chat` and asserts a `reply` is returned:
+
+```bash
+cd server
+npm test
+```
+
+The smoke test is useful for local checks and CI sanity testing.
+
