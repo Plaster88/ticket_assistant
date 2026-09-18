@@ -5,9 +5,8 @@
 // lives in dbService. Everything is wrapped so a failure produces a helpful
 // reply instead of a 500 the user experiences as a crash.
 
-import { getSqlFromClaude, summarizeResult, getRagAnswer, SAFE_FALLBACK_SQL } from '../services/aiService.js';
-import { queryDB } from '../services/dbService.js';
 import { buildIndex } from '../services/embeddingsService.js';
+import { handleUserQuery as orchestrate } from '../services/orchestrator.js';
 
 export async function handleUserQuery(req, res) {
   const { userPrompt } = req.body ?? {};
@@ -17,37 +16,11 @@ export async function handleUserQuery(req, res) {
   }
 
   try {
-    // 1. Natural language -> read-only SQL (validated inside the service).
-    const sql = await getSqlFromClaude(userPrompt);
-
-    // If the model returned the safe fallback SQL, route the request to the
-    // RAG/document retrieval path instead of executing the fallback query.
-    if (sql === SAFE_FALLBACK_SQL) {
-      const ragReply = await getRagAnswer(userPrompt);
-      return res.json({ reply: ragReply, sql, rowCount: 0, source: 'rag' });
-    }
-
-    // 2. Execute against SQLite. Guard the DB call so a bad-but-valid query
-    //    (e.g. a nonexistent column) still degrades gracefully.
-    let rows = [];
-    try {
-      rows = queryDB(sql);
-    } catch (dbError) {
-      console.error('[aiController] DB query failed:', dbError.message);
-      return res.json({
-        reply:
-          "I couldn't run that search against the tickets database. Try rephrasing your question.",
-        sql,
-      });
-    }
-
-    // 3. Rows -> human-readable answer.
-    const summary = await summarizeResult(rows, userPrompt);
-
-    // Return the summary plus the SQL and row count for demo transparency.
-    return res.json({ reply: summary, sql, rowCount: rows.length });
+    const result = await orchestrate(userPrompt);
+    // The orchestrator returns a consistent object: { reply, sql, rowCount, source }
+    return res.json(result);
   } catch (error) {
-    console.error('[aiController] Unexpected error:', error.message);
+    console.error('[aiController] Unexpected error:', error?.message ?? error);
     return res
       .status(500)
       .json({ error: 'Something went wrong while processing your request.' });
